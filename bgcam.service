@@ -1,0 +1,12 @@
+[Unit]
+Description=Background Replacing Webcam
+
+[Service]
+EnvironmentFile=-%h/.config/bgcam/config
+ExecStart=%h/.local/bin/bgcam
+WorkingDirectory=~
+Restart=on-failure
+ExecReload=kill -HUP $MAINPID
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,5 @@
+#!/bin/sh
+
+dir="$(dirname "$(readlink -f "$0")")"
+test -d "$dir/venv" && python="$dir/venv/bin/python" || python="python3"
+exec "$python" "$dir/bgcam.py" "$@"
