@@ -71,7 +71,6 @@ class TimedVideoCapture():
             if success:
                 self._last_frame_time = time.monotonic()
                 self._image = image
-                self._image.flags.writeable = False
             new = success
         else:
             if self._frame_time is None:
@@ -101,24 +100,17 @@ class Background():
     @param filename  Image or video to used as source.
     @param width     Fixed width of the output image.
     @param height    Fixed height of the output image.
-    @param fallback  An integer describing a color or an image.
+    @param fallback  An integer describing a color.
     """
     def __init__(self, filename, width, height, fallback=None):
         self._filename = filename
         self._target_shape = (height, width, 3)
+        if isinstance(fallback, int) and fallback >= 0:
+            # convert to rgb color
+            self._fallback = (fallback >> 16) & 0xff, (fallback >> 8) & 0xff, fallback & 0xff
+        else:
+            self._fallback = None
         self._image = np.zeros(self._target_shape, dtype=np.uint8)
-        if isinstance(fallback, int):
-            if fallback >= 0:
-                # convert to rgb color
-                self._image[:] = (fallback >> 16) & 0xff, (fallback >> 8) & 0xff, fallback & 0xff
-                self._fallback = True
-            else:
-                self._fallback = False
-        elif not fallback is None:
-            # Use provided fallback image
-            self._set_image(fallback)
-            self._fallback = True
-        self._image.flags.writeable = False
         self.reload()
 
     def _set_image(self, image):
@@ -133,8 +125,11 @@ class Background():
             self._next = lambda: (True, self._image, False)
         elif filename and (video := TimedVideoCapture(filename)) and video.isOpened():
             self._next = video.read
+        elif not self._fallback is None:
+            self._image[:] = self._fallback
+            self._next = lambda: (True, self._image, False)
         else:
-            self._next = lambda: (self._fallback, self._image, False)
+            self._next = lambda: (False, None, False)
 
     def read(self, dst=None):
         success, image, new = self._next()
