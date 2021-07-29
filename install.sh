@@ -34,7 +34,7 @@ After the installation, please do something like this:
 EOF
     cat <<'EOF'
 
-echo 'options v4l2loopback devices=1 exclusive_caps=1 video_nr=100 card_label="bgcam" | sudo tee /etc/modprobe.d/v4l2loopback.conf
+echo 'options v4l2loopback devices=1 exclusive_caps=1 video_nr=100 card_label="bgcam"' | sudo tee /etc/modprobe.d/v4l2loopback.conf
 echo v4l2loopback | sudo tee /etc/modules-load.d/v4l2loopback.conf
 sudo modprobe v4l2loopback
 
