@@ -70,11 +70,16 @@ fi
 dir="$(dirname "$(readlink -f "$0")")"
 cd "$dir"
 
-if [ "${1:-}" = venv ]; then
+if [ -n "$use_venv" ]; then
     test -d venv || python3 -m virtualenv venv
     source venv/bin/activate
+else
+    opencv="$(pip3 list --user | grep -o \
+        -e '^opencv-contrib-python-headless\s' \
+        -e '^opencv-python(-headless)?\s')" &&
+    pip3 uninstall --yes $opencv opencv-contrib-python || :
 fi
-pip3 install --disable-pip-version-check --user -r requirements.txt
+pip3 install -r requirements.txt
 
 mkdir -p ~/.config/systemd/user ~/.config/bgcam ~/.local/bin
 ln -srf "$dir/bgcam" ~/.local/bin/bgcam
