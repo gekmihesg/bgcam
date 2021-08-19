@@ -79,7 +79,14 @@ else
         -e '^opencv-python(-headless)?\s')" &&
     pip3 uninstall --yes $opencv opencv-contrib-python || :
 fi
+opencv_path() {
+    python3 -c 'import os,cv2;print(os.path.dirname(cv2.__file__))' \
+        2>/dev/null || :
+}
+old_opencv_path="$(opencv_path)"
 pip3 install -r requirements.txt
+test -z "$old_opencv_path" -o "$old_opencv_path" = "$(opencv_path)" ||
+    pip3 uninstall -y opencv-contrib-python
 
 mkdir -p ~/.config/systemd/user ~/.config/bgcam ~/.local/bin
 ln -srf "$dir/bgcam" ~/.local/bin/bgcam
