@@ -176,7 +176,7 @@ class ComposedCam():
     def __getattr__(self, name): return getattr(self._vc, name)
 
     def __init__(self, video_device, width, height, bg_stream,
-            threshold=25, blur=55, *args, **kwargs):
+            threshold=25, blur=55, model=1, *args, **kwargs):
         #super().__init__(video_device, *args, **kwargs)
         self._vc = cv2.VideoCapture(video_device, *args, **kwargs)
         if not self.isOpened():
@@ -186,7 +186,7 @@ class ComposedCam():
         self._threshold = max(0, min(100, threshold)) / 100
         self._blur = (max(3, blur | 1),) * 2
         self._mask_blur = (max(3, int(math.sqrt(width**2 + height**2) / 200) | 1),) * 2
-        self._segmenter = mp.solutions.selfie_segmentation.SelfieSegmentation(model_selection=1)
+        self._segmenter = mp.solutions.selfie_segmentation.SelfieSegmentation(model_selection=model)
 
         self._image = np.zeros(self._target_shape, dtype=np.uint8)
         self._bg_image = None
@@ -310,6 +310,9 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--threshold', type=int, default=50, help='''
             Certainty threshold in percent for splitting the input image into foreground and
             background.''')
+    parser.add_argument('-m', '--model', type=int, default=1, choices=[0, 1], help='''
+            Model to use for segmentation, use 0 to select the general model, and 1 to select the
+            landscape model''')
     parser.add_argument('-l', '--log-level', default='info',
             choices=[logging.getLevelName(x).lower() for x in log_levels], help='''
             Log level.''')
@@ -380,7 +383,7 @@ if __name__ == '__main__':
                     logger.debug('Did not find camera %s', filename)
                 else:
                     cam = ComposedCam(filename, config.width, config.height, bg_stream,
-                            config.threshold, config.blur_radius)
+                            config.threshold, config.blur_radius, config.model)
                     if cam.isOpened():
                         logger.info('Opened camera %s', filename)
                         break
