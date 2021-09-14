@@ -6,7 +6,6 @@ import time
 import signal
 import types
 import cv2
-import collections
 import logging
 import mediapipe as mp
 import numpy as np
@@ -425,8 +424,7 @@ if __name__ == '__main__':
 
         if show_fps:
             fps_last_display = time.monotonic()
-            frame_time = time.monotonic()
-            frame_timings = collections.deque(maxlen=fps)
+            frame_count = 0
 
         logger.debug('Start producing frames')
         while cam.isOpened() and not state.should_stop:
@@ -456,13 +454,12 @@ if __name__ == '__main__':
                 fake_cam.schedule_frame(image)
 
             if show_fps:
+                frame_count += 1
                 now = time.monotonic()
-                frame_timings.append(now - frame_time)
-                frame_time = now
-                if now - fps_last_display >= 0.5: # update every 500ms
-                    # average fps over the last second
-                    print(' % 6.2f FPS' %(1 / np.mean(frame_timings)), end='\r')
-                    fps_last_display = now
+                time_passed = now - fps_last_display
+                if time_passed >= 1: # update every second
+                    print(' % 6.2f FPS' %(frame_count / time_passed), end='\r')
+                    fps_last_display, frame_count = now, 0
 
             if limit_fps:
                 time.sleep(max(0, 1 / fps - time.monotonic() + frame_process_start))
