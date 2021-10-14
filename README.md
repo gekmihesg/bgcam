@@ -9,14 +9,16 @@ This project is intended to be run as a systemd user service. It needs
 [v4l2loopback][3] device (or similar) to output the image. The `install.sh`
 script will provide hints for setting this up.
 
+The virtual webcam is watched with inotify to keep track whether there are
+consumers. By default, only once the virtual webcam is opened, the real camera
+should turn on and image processing starts. Sending `SIGUSR2` to the process
+toggles a always-on mode.
+
 For the real camera, multiple input devices can be given and the first available
 device will be used. If the device becomes unavailable, it will automatically
 switch to the next in list. This can be useful for docking station setups.
-
-The virtual webcam is watched with inotify to keep track whether there are
-consumers. Only once the virtual webcam is opened, the real camera should turn
-on and image processing starts. (When the camera is reconnected, send `SIGHUP`
-to switch back while active.)
+If the preferred camera is reconnected while a fallback camera is active, send
+`SIGHUP` to the process to switch back.
 
 The background can be either a predefined color, an image or a video. If none of
 those are given, the background will be blurred instead. Image or video can be
@@ -31,9 +33,10 @@ start the service. (Add `-v` to use a python virtual environment.)
 ## Usage
 
 ```
-usage: bgcam [-h] [-b BACKGROUND] [-c FALLBACK_COLOR] [-B BLUR_RADIUS]
+usage: bgcam [-h] [-b BACKGROUND] [-c FALLBACK_COLOR] [-B BLUR_RADIUS] [-a]
              [-F FPS] [-W WIDTH] [-H HEIGHT] [-C CODEC] [-v LOOPBACK_DEVICE]
-             [-t THRESHOLD] [-l {critical,error,warning,info,debug}]
+             [-t THRESHOLD] [-m {0,1}]
+             [-l {critical,error,warning,info,debug}]
              [camera ...]
 
 All options can be passed by using environment variables, i.e.
@@ -46,9 +49,9 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -b BACKGROUND, --background BACKGROUND
-                        Background image or video. If the file doesn't
-                        exists, a fallback color or the blurred camera image
-                        will be used instead. (default:
+                        Background image or video. If the file doesn't exists,
+                        a fallback color or the blurred camera image will be
+                        used instead. (default:
                         $HOME/.config/bgcam/background)
   -c FALLBACK_COLOR, --fallback-color FALLBACK_COLOR
                         Color to use as background if background image does
@@ -56,6 +59,8 @@ optional arguments:
   -B BLUR_RADIUS, --blur-radius BLUR_RADIUS
                         Blur radius for background if background image does
                         not exist and no fallback color is set. (default: 55)
+  -a, --always-on       Do not wait for consumers before producing images.
+                        (default: False)
   -F FPS, --fps FPS     Frame rate limit. Use the camera's default frame rate
                         if set to 0. If the camera is slower, this option as
                         no effect. (default: 0)
@@ -71,14 +76,17 @@ optional arguments:
                         V4L2 loopback device to use as output. (default:
                         /dev/video100)
   -t THRESHOLD, --threshold THRESHOLD
-                        Certainty threshold in percent for splitting the
-                        input image into foreground and background. (default:
-                        50)
+                        Certainty threshold in percent for splitting the input
+                        image into foreground and background. (default: 50)
+  -m {0,1}, --model {0,1}
+                        Model to use for segmentation, use 0 to select the
+                        general model, and 1 to select the landscape model
+                        (default: 1)
   -l {critical,error,warning,info,debug}, --log-level {critical,error,warning,info,debug}
                         Log level. (default: info)
 
 SIGHUP re-opens the camera (in preferred order), SIGUSR1 reloads the
-background image.
+background image, SIGUSR2 toggles between on-demand and always-on state.
 ```
 
 `bgcam-set-background` manages the background image as a symlink. Passing a

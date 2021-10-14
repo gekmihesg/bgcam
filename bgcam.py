@@ -146,7 +146,7 @@ class FakeCam(pyfakewebcam.FakeWebcam):
     """
     FakeWebcam wrapper with consumer counter using inotify.
     """
-    def __init__(self, video_device, width, height, *args, **kwargs):
+    def __init__(self, video_device, width, height, always_on=False, *args, **kwargs):
         super().__init__(video_device, width, height, *args, **kwargs)
         self._blank_frame = np.zeros((height, width, 3), dtype=np.uint8)
         self.blank()
@@ -154,9 +154,17 @@ class FakeCam(pyfakewebcam.FakeWebcam):
         self._inotify = inotify.INotify(nonblocking=True)
         self._inotify.add_watch(os.path.realpath(video_device),
             inotify.flags.OPEN | inotify.flags.CLOSE_NOWRITE| inotify.flags.CLOSE_WRITE)
+        self._always_on = always_on
 
     def blank(self):
         self.schedule_frame(self._blank_frame)
+
+    def set_always_on(self, state):
+        self._always_on = state
+
+    def toggle_always_on(self):
+        self.set_always_on(not self._always_on)
+        return self._always_on
 
     def has_consumers(self):
         for event in self._inotify.read(0):
@@ -166,7 +174,7 @@ class FakeCam(pyfakewebcam.FakeWebcam):
                 self._consumers = max(0, self._consumers - 1)
             if event.mask & inotify.flags.OPEN:
                 self._consumers += 1
-        return self._consumers > 0
+        return self._consumers > 0 or self._always_on
 
 
 class ComposedCam():
@@ -284,7 +292,7 @@ if __name__ == '__main__':
                 i.e. {env_prefix}LOOPBACK_DEVICE).''',
             epilog='''
                 SIGHUP re-opens the camera (in preferred order), SIGUSR1 reloads the background
-                image.''')
+                image, SIGUSR2 toggles between on-demand and always-on state.''')
     parser.add_argument('-b', '--background', default=os.path.join(os.path.expanduser('~'),
                 '.config', APPLICATION, 'background'), help='''
             Background image or video. If the file doesn\'t exists, a fallback color or the
@@ -294,6 +302,8 @@ if __name__ == '__main__':
     parser.add_argument('-B', '--blur-radius', type=int, default=55, help='''
             Blur radius for background if background image does not exist and no fallback color is
             set.''')
+    parser.add_argument('-a', '--always-on', action='store_true', help='''
+            Do not wait for consumers before producing images.''')
     parser.add_argument('-F', '--fps', type=int, default=0, help='''
             Frame rate limit. Use the camera\'s default frame rate if set to 0.
             If the camera is slower, this option as no effect.''')
@@ -349,7 +359,7 @@ if __name__ == '__main__':
         config.codec = 0
 
     try:
-        fake_cam = FakeCam(config.loopback_device, config.width, config.height)
+        fake_cam = FakeCam(config.loopback_device, config.width, config.height, config.always_on)
     except Exception as e:
         logger.error('%s - Close all consumers and try again', str(e).strip())
         sys.exit(1)
@@ -363,6 +373,8 @@ if __name__ == '__main__':
     state.add_signal('reload_camera', signal.SIGHUP)
     state.add_signal('reload_background', signal.SIGUSR1)
     state.add_signal('should_stop', signal.SIGINT, signal.SIGQUIT, signal.SIGTERM, persist=True)
+    signal.signal(signal.SIGUSR2, lambda s, f: logger.info('Set to %s',
+            'always-on' if fake_cam.toggle_always_on() else 'on-demand'))
 
     logger.debug('Starting main loop')
     while not state.should_stop:
