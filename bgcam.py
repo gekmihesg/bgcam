@@ -52,8 +52,12 @@ class TimedVideoCapture():
     def __init__(self, filename, loop=True, *args, **kwargs):
         #super().__init__(filename, *args, **kwargs)
         self._vc = cv2.VideoCapture(filename, *args, **kwargs)
-        self._loop = loop
-        self.reset()
+        if self.isOpened() and self.get(cv2.CAP_PROP_BACKEND) == cv2.CAP_V4L2:
+            self.read = lambda *args, **kwargs: self._vc.read(*args, **kwargs) + (True,)
+            self.reset = lambda: None
+        else:
+            self._loop = loop
+            self.reset()
 
     def reset(self):
         self._image = None
@@ -110,6 +114,7 @@ class Background():
         else:
             self._fallback = None
         self._image = np.zeros(self._target_shape, dtype=np.uint8)
+        self._release = None
         self.reload()
 
     def _set_image(self, image):
@@ -119,11 +124,15 @@ class Background():
 
     def reload(self):
         filename = self._filename if self._filename and os.path.exists(self._filename) else None
+        if callable(self._release):
+            self._release()
+            self._release = None
         if filename and (image := cv2.imread(filename)) is not None:
             self._set_image(image)
             self._next = lambda: (True, self._image, False)
         elif filename and (video := TimedVideoCapture(filename)) and video.isOpened():
             self._next = video.read
+            self._release = video.release
         elif not self._fallback is None:
             self._image[:] = self._fallback
             self._next = lambda: (True, self._image, False)

@@ -3,6 +3,8 @@ set -eu
 test -n "${BGCAM_BACKGROUND:-}" -o ! -f ~/.config/bgcam/config ||
     source ~/.config/bgcam/config
 fn="${BGCAM_BACKGROUND:-$HOME/.config/bgcam/background}"
-test -n "${1:-}" -a -f "${1:-}" &&
-    ln -srf "$(readlink -f "$1")" "$fn" || rm -f "$fn"
+test -n "${1:-}" -a -e "${1:-}" &&
+    src="$(readlink -f "$1")" &&
+    ln -sf $(test "${src#$HOME/}" = "$src" || echo -r) -- "$src" "$fn" ||
+        rm -f "$fn"
 systemctl --user kill bgcam.service --signal SIGUSR1 || :
