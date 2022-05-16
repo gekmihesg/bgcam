@@ -206,6 +206,7 @@ class ComposedCam():
 
         self._image = np.zeros(self._target_shape, dtype=np.uint8)
         self._bg_image = None
+        self._inv_mask = None
 
     def read(self, dst=None):
         # success, raw_image = super().read()
@@ -228,10 +229,18 @@ class ComposedCam():
 
         success, bg_image = self._bg_stream.read() # already rgb
         if not success:  # no background image available, use blurred version of the original
-            self._bg_image = cv2.blur(image, self._blur, self._bg_image)
+            self._inv_mask = np.subtract(1, mask[..., np.newaxis], out=self._inv_mask)
+            if self._bg_image is None:
+                self._bg_image = np.zeros(image.shape, dtype=image.dtype)
+            np.multiply(image, self._inv_mask, out=self._bg_image, casting='unsafe')
+            cv2.blur(self._bg_image, self._blur, self._bg_image)
+            cv2.blur(self._inv_mask, self._blur, self._inv_mask)
+            np.divide(self._bg_image, self._inv_mask, where=self._inv_mask>0,
+                    out=self._bg_image, casting='unsafe')
             bg_image = self._bg_image
         else: # free the buffer
             self._bg_image = None
+            self._inv_mask = None
 
         cv2.blendLinear(image, bg_image, mask, 1 - mask, image)
         return (True, image)
